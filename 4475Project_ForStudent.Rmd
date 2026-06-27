@@ -13,16 +13,29 @@ require(rpart.plot)
 
 data input
 ```{r}
-
+getwd()
+data <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 2)
+info <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 1)
 ```
 
 Data Observation / Cleansing
 ```{r}
 #prove there are 70680 sales records
+nrow(data)
 
 #prove product name in both dataset are synchronized
+DataProducts <- unique(data$商品)
+InfoProducts <- unique(info$商品)
+
+DataMissing <- setdiff(InfoProducts, DataProducts)
+InfoMissing <- setdiff(DataProducts, InfoProducts)
+
+DataMissing
+InfoMissing
 
 #prove product_price = actual paid
+pricediff = setdiff(data$应付金额, data$实际金额)
+pricediff
 
 #list any uncleaned data for cleansing if necessary
 
