@@ -14,14 +14,17 @@ require(rpart.plot)
 data input
 ```{r}
 getwd()
-data <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 2)
+rdata <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 2)
 info <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 1)
+data <- rdata 
 ```
 
 Data Observation / Cleansing
 ```{r}
 #prove there are 70680 sales records
-nrow(data)
+nrow(rdata)
+u<- unique(rdata)
+print(u)
 
 #prove product name in both dataset are synchronized
 DataProducts <- unique(data$商品)
@@ -41,7 +44,10 @@ pricediff
 colSums(is.na(data))
 data <- na.omit(data)
 
+data$支付时间 <- as.POSIXct(data$支付时间, format="%Y-%m-%d %H:%M:%S")
 
+data$实际金额 <- as.numeric(as.character(data$实际金额))
+data$应付金额 <- as.numeric(as.character(data$应付金额))
 ```
 
 Merge Data
@@ -79,15 +85,19 @@ total_row <- data.frame(地点 = "总计",
                         销售额 = sum(result_table$销售额))
 
 final_table <- rbind(result_table, total_row)
+
+final_table
 ```
 
 Mission 1.3 Summaries the monthly average Revenue of each Vendor machine and also it is daily average Sale volume.
 ```{r}
+merged_data$月份 <- format(merged_data$支付时间, "%m")
+agg_data <- aggregate(实际金额 ~ 地点 + 月份, data = merged_data, FUN = sum)
+
 agg_data$地点 <- factor(agg_data$地点, levels = c("A", "B", "C", "D", "E"))
-agg_data$月份 <- as.numeric(agg_data$月份)
+agg_data$月份 <- agg_data$月份
 final_list <- agg_data[order(agg_data$地点, agg_data$月份), ]
 print(final_list)
-
 
 
 merged_data$日期 <- as.numeric(format(merged_data$支付时间, "%d"))
@@ -171,7 +181,25 @@ Mission2.3 plot margin revenue proportion for each vendor machine. Suppose the m
 
 Mission 2.4 - plot the total revenue of each machines in April 2027 by bubble chart
 ```{r}
+bubble_data <- sqldf("
+    SELECT 地点 AS Location,
+           SUM(`实际金额`) AS Total_Revenue,
+           COUNT(*) AS Order_Count
+    FROM merged_data
+    GROUP BY 地点
+")
 
+print(bubble_data)
+
+ggplot(bubble_data, aes(x = Location, y = Total_Revenue, size = Order_Count)) +
+  geom_point(alpha = 0.8, color = "darkblue") +
+  scale_size_continuous(range = c(10, 25)) +
+  labs(title = "Total Revenue of Each Machine",
+       x = "Location",
+       y = "Total Revenue (HKD)",
+       size = "Order Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 ```
 
 Mission 2.5 - plot the revenue of Vendor machine C in June, July, and August and summmarise the data by heatmap graph.
@@ -182,30 +210,7 @@ Mission 3.1
 Use any machine learning approach to auto labelling the salse status of each brevage products in each Vendor machine. There are three types of labels : unsaleable, normal, trending. In which, unsaleable means the salse status was uncertain, and normal means there is no observable sale pattern, treding mean the sale is good. 
 
 ```{r}
-beverage_data <- subset(merged_data, 大类 == "饮料")
-revenue_table <- aggregate(实际金额 ~ 商品, data = beverage_data, FUN = sum)
-frequency_table <- aggregate(订单号 ~ 商品, data = beverage_data, FUN = length)
-product_metrics <- merge(revenue_table, frequency_table, by = "商品")
-colnames(product_metrics) <- c("Product", "Revenue", "Frequency")
 
-scaled_data <- scale(product_metrics[, c("Revenue", "Frequency")])
-set.seed(123)
-kmeans_result <- kmeans(scaled_data, centers = 3)
-product_metrics$Group <- kmeans_result$cluster
-
-product_metrics$Status <- "Normal"
-product_metrics$Status[product_metrics$Group == 1] <- "Unsaleable"
-product_metrics$Status[product_metrics$Group == 2] <- "Trending"
-product_metrics$Status[product_metrics$Group == 3] <- "Normal"
-
-location_map <- unique(beverage_data[, c("商品", "地点")])
-
-final_report <- merge(location_map, product_metrics[, c("Product", "Status")],  by.x = "商品", by.y = "Product")
-
-colnames(final_report) <- c("商品名称", "销售地点", "商品分类")
-final_report <- final_report[order(final_report$商品名称), ]
-
-print(final_report)
 ```
 
 Mission 3.2  Use any machine learning approach to classify the sale segnments of different types of product category by the relationship of the Category total Revenue.
