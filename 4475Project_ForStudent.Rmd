@@ -182,7 +182,30 @@ Mission 3.1
 Use any machine learning approach to auto labelling the salse status of each brevage products in each Vendor machine. There are three types of labels : unsaleable, normal, trending. In which, unsaleable means the salse status was uncertain, and normal means there is no observable sale pattern, treding mean the sale is good. 
 
 ```{r}
+beverage_data <- subset(merged_data, 大类 == "饮料")
+revenue_table <- aggregate(实际金额 ~ 商品, data = beverage_data, FUN = sum)
+frequency_table <- aggregate(订单号 ~ 商品, data = beverage_data, FUN = length)
+product_metrics <- merge(revenue_table, frequency_table, by = "商品")
+colnames(product_metrics) <- c("Product", "Revenue", "Frequency")
 
+scaled_data <- scale(product_metrics[, c("Revenue", "Frequency")])
+set.seed(123)
+kmeans_result <- kmeans(scaled_data, centers = 3)
+product_metrics$Group <- kmeans_result$cluster
+
+product_metrics$Status <- "Normal"
+product_metrics$Status[product_metrics$Group == 1] <- "Unsaleable"
+product_metrics$Status[product_metrics$Group == 2] <- "Trending"
+product_metrics$Status[product_metrics$Group == 3] <- "Normal"
+
+location_map <- unique(beverage_data[, c("商品", "地点")])
+
+final_report <- merge(location_map, product_metrics[, c("Product", "Status")],  by.x = "商品", by.y = "Product")
+
+colnames(final_report) <- c("商品名称", "销售地点", "商品分类")
+final_report <- final_report[order(final_report$商品名称), ]
+
+print(final_report)
 ```
 
 Mission 3.2  Use any machine learning approach to classify the sale segnments of different types of product category by the relationship of the Category total Revenue.
