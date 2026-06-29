@@ -274,30 +274,113 @@ Mission 3.1
 Use any machine learning approach to auto labelling the salse status of each brevage products in each Vendor machine. There are three types of labels : unsaleable, normal, trending. In which, unsaleable means the salse status was uncertain, and normal means there is no observable sale pattern, treding mean the sale is good. 
 
 ```{r}
-beverage_data <- subset(merged_data, 大类 == "饮料")
-revenue_table <- aggregate(实际金额 ~ 商品, data = beverage_data, FUN = sum)
-frequency_table <- aggregate(订单号 ~ 商品, data = beverage_data, FUN = length)
-product_metrics <- merge(revenue_table, frequency_table, by = "商品")
-colnames(product_metrics) <- c("Product", "Revenue", "Frequency")
+beverage_data <- merged_data[merged_data$大类 == "饮料", ] 
 
-scaled_data <- scale(product_metrics[, c("Revenue", "Frequency")])
-set.seed(123)
-kmeans_result <- kmeans(scaled_data, centers = 3)
-product_metrics$Group <- kmeans_result$cluster
+ 
 
-product_metrics$Status <- "Normal"
-product_metrics$Status[product_metrics$Group == 1] <- "Unsaleable"
-product_metrics$Status[product_metrics$Group == 2] <- "Trending"
-product_metrics$Status[product_metrics$Group == 3] <- "Normal"
+sales_count <- aggregate(订单号 ~ 商品,  
 
-location_map <- unique(beverage_data[, c("商品", "地点")])
+                         data = beverage_data,  
 
-final_report <- merge(location_map, product_metrics[, c("Product", "Status")],  by.x = "商品", by.y = "Product")
+                         FUN = length) 
 
-colnames(final_report) <- c("商品名称", "销售地点", "商品分类")
-final_report <- final_report[order(final_report$商品名称), ]
+colnames(sales_count) <- c("Product", "Sales_Count") 
 
-print(final_report)
+ 
+
+sales_revenue <- aggregate(实际金额 ~ 商品,  
+
+                           data = beverage_data,  
+
+                           FUN = sum) 
+
+colnames(sales_revenue) <- c("Product", "Total_Revenue") 
+
+ 
+
+sales_avg <- aggregate(实际金额 ~ 商品,  
+
+                       data = beverage_data,  
+
+                       FUN = mean) 
+
+colnames(sales_avg) <- c("Product", "Avg_Price") 
+
+ 
+
+ 
+
+sales_status <- merge(sales_count, sales_revenue, by = "Product") 
+
+sales_status <- merge(sales_status, sales_avg, by = "Product") 
+
+ 
+
+sales_status$Percentile <- rank(sales_status$Total_Revenue) / nrow(sales_status) 
+
+sales_status$Label <- sapply(sales_status$Percentile, function(x){ 
+
+  if(x <= 0.33){ 
+
+    x <- "unsaleable" 
+
+  } else if(x <= 0.66){ 
+
+    x <- "normal" 
+
+  } else { 
+
+    x <- "trending" 
+
+  } 
+
+}) 
+
+table(sales_status$Label) 
+
+train_data <- sales_status[, c("Sales_Count", "Total_Revenue", "Avg_Price", "Label")] 
+
+size <- nrow(train_data) 
+
+training_index <- sample(1:size, size * 0.8, replace = FALSE) 
+
+train <- train_data[training_index, ] 
+
+test <- train_data[-training_index, ] 
+
+model <- rpart(Label ~ Sales_Count + Total_Revenue + Avg_Price,  
+
+               data = train,  
+
+               method = "class") 
+
+ 
+
+prp(model,  
+
+    fallen.leaves = TRUE, 
+
+    main = "Decision Tree for Beverage Sales Status Classification", 
+
+    extra = 100) 
+
+ 
+
+All_Predicted <- predict(model, sales_status[, c("Sales_Count", "Total_Revenue", "Avg_Price")], type = "class") 
+
+sales_status$Predicted_Label <- All_Predicted 
+
+ 
+
+final_result <- sales_status[, c("Product", "Sales_Count", "Total_Revenue", "Predicted_Label")] 
+
+colnames(final_result)[4] <- "Sales_Status" 
+
+ 
+
+ 
+
+head(final_result, 10) 
 ```
 
 Mission 3.2  Use any machine learning approach to classify the sale segnments of different types of product category by the relationship of the Category total Revenue.
@@ -354,4 +437,28 @@ final_category_result <- data.frame(
 final_category_result<-final_category_result[order(final_category_result$Sales_Segment), ]
 final_category_result
 
+```
+
+
+
+
+#C
+```{r}
+trending_C <- sqldf("
+    SELECT 商品 AS Product,
+           COUNT(*) AS Sales_Count,
+           SUM(实际金额) AS Total_Revenue
+    FROM merged_data
+    WHERE 地点 = 'C' AND 大类 = '饮料'
+    GROUP BY 商品
+    ORDER BY Total_Revenue DESC
+    LIMIT 5
+")
+
+ggplot(trending_C, aes(x = reorder(Product, Total_Revenue), y = Total_Revenue)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Trending Products in Vendor Machine C",
+       x = "Product", y = "Total Revenue") +
+  theme_minimal()
 ```
