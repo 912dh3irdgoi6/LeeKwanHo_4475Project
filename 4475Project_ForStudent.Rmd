@@ -109,16 +109,11 @@ print(final_daily_list)
 
 Mission2.1 visualise the top 5 sale product in June 2017 using bar chart
 ```{r}
-june_data <- sqldf("
-    SELECT * 
-    FROM merged_data 
-    WHERE strftime('%Y-%m', 支付时间) = '2017-06'
-")
+june_data <- merged_data[format(merged_data$`支付时间`, "%Y-%m") == "2017-06", ]
 
 top5 <- sqldf("
     SELECT 商品 AS Product, 
-           SUM(实际金额) AS Total_Revenue,
-           COUNT(*) AS Quantity
+           SUM(`实际金额`) AS Total_Revenue
     FROM june_data
     GROUP BY 商品
     ORDER BY Total_Revenue DESC
@@ -126,50 +121,41 @@ top5 <- sqldf("
 ")
 
 ggplot(top5, aes(x = reorder(Product, Total_Revenue), y = Total_Revenue)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  coord_flip() +
-  labs(title = "Top 5 Selling Products in June 2017",
-       x = "Product Name", 
-       y = "Total Revenue (HKD)") +
+  geom_bar(stat = "identity", fill = c("#00FF00","#00FFFF","#8A2BE2","#FF8C00","#FFD700")) +
+  labs(title = "Best Five Sale Products",
+       x = "Product Name", y = "Revenue") +
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Mission 2.2 visualise all vendor machine revenue trend in monthly basis and also its growth rate in bar chart.
 ```{r}
-monthly <- sqldf("
-    SELECT strftime('%Y-%m', 支付时间) AS Month,
-           SUM(实际金额) AS Total_Revenue
-    FROM merged_data
-    GROUP BY strftime('%Y-%m', 支付时间)
-    ORDER BY Month
-")
+# Create monthly table
+monthly <- aggregate(实际金额 ~ format(`支付时间`, "%Y-%m"), 
+                     data = merged_data, 
+                     FUN = sum)
 
-monthly$Growth_Rate <- NAreal
+names(monthly) <- c("Month", "Total_Revenue")
+monthly <- monthly[order(monthly$Month), ]
 
-for(i in 2:nrow(monthly)) {
-  if(!is.na(monthly$Total_Revenue[i-1]) && monthly$Total_Revenue[i-1] != 0) {
-    monthly$Growth_Rate[i] <- (monthly$Total_Revenue[i] - monthly$Total_Revenue[i-1]) / 
-                              monthly$Total_Revenue[i-1] * 100
-  }
-}
+print(monthly)
 
+# Growth Rate
+monthly$Growth_Rate <- c(NA, diff(monthly$Total_Revenue) / monthly$Total_Revenue[-nrow(monthly)] * 100)
+
+print(monthly)
+
+# Plots
 ggplot(monthly, aes(x = Month, y = Total_Revenue, group = 1)) +
-  geom_line(color = "blue", size = 1.2) +
-  geom_point(color = "blue", size = 3) +
-  labs(title = "Monthly Revenue Trend (All Machines)",
-       x = "Month", 
-       y = "Total Revenue (HKD)") +
+  geom_line(color = "blue", size = 1.1) +
+  geom_point(color = "blue") +
+  labs(title = "Monthly Revenue Trend", x = "Month", y = "Revenue") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ggplot(monthly, aes(x = Month, y = Growth_Rate)) +
-  geom_bar(stat = "identity", 
-           fill = ifelse(is.na(monthly$Growth_Rate), "grey", 
-                         ifelse(monthly$Growth_Rate >= 0, "darkgreen", "red"))) +
-  labs(title = "Monthly Revenue Growth Rate (%)",
-       x = "Month", 
-       y = "Growth Rate (%)") +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Monthly Revenue Growth Rate (%)", x = "Month", y = "Growth Rate (%)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
