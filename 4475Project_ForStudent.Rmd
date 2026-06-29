@@ -13,9 +13,9 @@ require(rpart.plot)
 
 data input
 ```{r}
-getwd()
-rdata <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 2)
-info <- read.xlsx("C:/Users/OWNER/Desktop/ITP4475_student_project/sale_Data.xlsx", sheetIndex = 1)
+a <- file.choose()
+rdata <- read.xlsx(a, sheetIndex = 2)
+info <- read.xlsx(a, sheetIndex = 1)
 data <- rdata 
 ```
 
@@ -130,7 +130,7 @@ ggplot(top5, aes(x = reorder(Product, Total_Revenue), y = Total_Revenue)) +
 
 Mission 2.2 visualise all vendor machine revenue trend in monthly basis and also its growth rate in bar chart.
 ```{r}
-# Create monthly table
+# Create monthly table using base R (more reliable)
 monthly <- aggregate(实际金额 ~ format(`支付时间`, "%Y-%m"), 
                      data = merged_data, 
                      FUN = sum)
@@ -246,7 +246,29 @@ ggplot(bubble_data, aes(x = Location, y = Total_Revenue, size = Order_Count)) +
 
 Mission 2.5 - plot the revenue of Vendor machine C in June, July, and August and summmarise the data by heatmap graph.
 ```{r}
+machineC <- sqldf("
+    SELECT 
+        CAST(substr(支付时间, 6, 2) AS INTEGER) AS Month_Num,
+        CAST(substr(支付时间, 9, 2) AS INTEGER) AS Day_Num,
+        SUM(实际金额) AS Daily_Revenue
+    FROM merged_data
+    WHERE 地点 = 'C' 
+      AND CAST(substr(支付时间, 6, 2) AS INTEGER) IN (6, 7, 8)
+    GROUP BY Month_Num, Day_Num
+")
 
+all_days <- expand.grid(Month_Num = c(6, 7, 8), Day_Num = 1:31)
+heatmap_data <- merge(all_days, machineC, by = c("Month_Num", "Day_Num"), all.x = TRUE)
+heatmap_data$Daily_Revenue[is.na(heatmap_data$Daily_Revenue)] <- 0
+heatmap_data$Month_Label <- factor(heatmap_data$Month_Num, levels = c(6, 7, 8), labels = c("June", "July", "August"))
+
+ggplot(heatmap_data, aes(x = Day_Num, y = Month_Label, fill = Daily_Revenue)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#deebf7", high = "#08306b") +
+  scale_x_continuous(breaks = seq(1, 31, by = 2)) +
+  labs(title = "Daily Revenue Heatmap: Machine C (June - August)",
+       x = "Day of Month", y = "Month", fill = "Revenue (HKD)") +
+  theme_minimal()
 ```
 Mission 3.1
 Use any machine learning approach to auto labelling the salse status of each brevage products in each Vendor machine. There are three types of labels : unsaleable, normal, trending. In which, unsaleable means the salse status was uncertain, and normal means there is no observable sale pattern, treding mean the sale is good. 
