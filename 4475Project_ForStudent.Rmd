@@ -215,5 +215,56 @@ Use any machine learning approach to auto labelling the salse status of each bre
 
 Mission 3.2  Use any machine learning approach to classify the sale segnments of different types of product category by the relationship of the Category total Revenue.
 ```{r}
+category_revenue <- tapply(merged_data$实际金额, merged_data$大类, sum)
+category_count <- tapply(merged_data$订单号, merged_data$大类, length)
+category_avg <- tapply(merged_data$实际金额, merged_data$大类, mean)
+
+
+category_data <- data.frame(
+  Category = names(category_revenue),
+  Total_Revenue = as.numeric(category_revenue),
+  Order_Count = as.numeric(category_count),
+  Avg_Price = as.numeric(category_avg)
+)
+
+
+category_data <- category_data[order(category_data$Total_Revenue, decreasing = TRUE), ]
+n <- nrow(category_data)
+
+category_data$Percentile <- rank(category_data$Total_Revenue) / n
+category_data$Label <- ifelse(category_data$Percentile <= 0.33, "low",
+                       ifelse(category_data$Percentile <= 0.66, "medium", "high"))
+category_data
+
+
+size <- nrow(category_data)
+training_index <- sample(1:size, size * 0.8, replace = FALSE)
+train <- category_data[training_index, ]
+test <- category_data[-training_index, ]
+
+
+train$Label <- factor(train$Label)
+
+
+model_category <- rpart(Label ~ Total_Revenue + Order_Count + Avg_Price, data = train)
+
+All_Predicted <- predict(model_category, 
+                          category_data[, c("Total_Revenue", "Order_Count", "Avg_Price")], 
+                          type = "class")
+
+category_data$Predicted_Label <- All_Predicted
+
+
+final_category_result <- data.frame(
+  Category = category_data$Category,
+  Total_Revenue = category_data$Total_Revenue,
+  Order_Count = category_data$Order_Count,
+  Avg_Price = category_data$Avg_Price,
+  Sales_Segment = category_data$Predicted_Label
+)
+
+
+final_category_result<-final_category_result[order(final_category_result$Sales_Segment), ]
+final_category_result
 
 ```
