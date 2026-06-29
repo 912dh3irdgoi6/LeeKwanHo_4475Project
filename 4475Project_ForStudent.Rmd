@@ -176,7 +176,63 @@ ggplot(monthly, aes(x = Month, y = Growth_Rate)) +
 
 Mission2.3 plot margin revenue proportion for each vendor machine. Suppose the margin revenue rate of beverage and non-beverage is 25% and 20% respectively.
 ```{r}
+# Calculate Revenue by Location and Category
+margin_data <- sqldf("
+    SELECT 地点 AS Location,
+           大类 AS Category,
+           SUM(`实际金额`) AS Revenue
+    FROM merged_data
+    GROUP BY 地点, 大类
+")
 
+margin_data$Margin_Revenue <- ifelse(margin_data$Category == "饮料", 
+                                     margin_data$Revenue * 0.25, 
+                                     margin_data$Revenue * 0.20)
+
+# Make sure every location has both categories
+all_combinations <- expand.grid(Location = unique(margin_data$Location),
+                                Category = c("饮料", "非饮料"))
+
+margin_full <- merge(all_combinations, margin_data, 
+                     by = c("Location", "Category"), all.x = TRUE)
+
+margin_full$Margin_Revenue[is.na(margin_full$Margin_Revenue)] <- 0
+
+# Plot
+ggplot(margin_full, aes(x = "", y = Margin_Revenue, fill = Category)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  facet_wrap(~ Location, nrow = 2) +
+  labs(title = "Margin Revenue Proportion for Each Vendor Machine",
+       fill = "Category") +
+  theme_void() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Plot separate pie charts
+margin_data$Margin <- ifelse(margin_data$Category == "饮料", 
+                             margin_data$Revenue * 0.25, 
+                             margin_data$Revenue * 0.20)
+
+locations <- unique(margin_data$Location)
+
+for(loc in locations){
+  df <- margin_data[margin_data$Location == loc, ]
+  
+  # Add missing category if necessary
+  if(nrow(df) == 1){
+    missing_cat <- ifelse(df$Category[1] == "饮料", "非饮料", "饮料")
+    df <- rbind(df, data.frame(Location = loc, Category = missing_cat, Revenue = 0, Margin = 0))
+  }
+  
+  p <- ggplot(df, aes(x = "", y = Margin, fill = Category)) +
+    geom_bar(stat = "identity", width = 1) +
+    coord_polar("y") +
+    labs(title = paste("Machine", loc)) +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  print(p)
+}
 ```
 
 Mission 2.4 - plot the total revenue of each machines in April 2027 by bubble chart
